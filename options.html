@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Page Element Notifier — Settings</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Settings</h1>
+
+    <section class="card">
+      <h2>Pushover Credentials</h2>
+      <label>
+        User Key
+        <input type="text" id="userKey" placeholder="your-pushover-user-key" />
+      </label>
+      <label>
+        App Token
+        <input type="text" id="appToken" placeholder="your-app-api-token" />
+      </label>
+      <label>
+        Notification Cooldown (seconds)
+        <input type="number" id="dedupeIntervalSecs" min="1" placeholder="3600" />
+        <span class="hint">Minimum time between repeat notifications for the same rule on the same tab. Default: 3600 (1 hour).</span>
+      </label>
+      <button id="saveCredentials">Save Credentials</button>
+      <p class="status" id="credStatus"></p>
+    </section>
+
+    <section class="card">
+      <h2>Monitoring Rules</h2>
+      <p class="hint">Each rule watches for a CSS selector on every page and fires a Pushover notification when it appears.</p>
+
+      <div id="rulesList"></div>
+
+      <div class="rule-form card-inner">
+        <h3>Add / Edit Rule</h3>
+        <input type="hidden" id="editRuleId" />
+        <label>
+          Label
+          <input type="text" id="ruleLabel" placeholder="e.g. Out-of-stock banner" />
+        </label>
+        <label>
+          CSS Selector
+          <input type="text" id="ruleSelector" placeholder="e.g. .alert-banner, #error-msg" />
+        </label>
+        <label>
+          Notification Priority
+          <select id="rulePriority">
+            <option value="0">Normal</option>
+            <option value="1">High — bypasses quiet hours</option>
+            <option value="2">Emergency — repeats until acknowledged</option>
+          </select>
+        </label>
+        <div id="emergencyFields" style="display:none" class="card-inner">
+          <label>
+            Retry every (seconds, min 30)
+            <input type="number" id="ruleRetry" min="30" value="60" />
+          </label>
+          <label>
+            Stop retrying after (seconds, max 10800)
+            <input type="number" id="ruleExpire" min="30" max="10800" value="3600" />
+          </label>
+        </div>
+        <label class="row">
+          <input type="checkbox" id="ruleEnabled" checked />
+          Enabled
+        </label>
+        <div class="btn-row">
+          <button id="saveRule">Save Rule</button>
+          <button id="cancelEdit" class="secondary" style="display:none">Cancel</button>
+        </div>
+        <p class="status" id="ruleStatus"></p>
+      </div>
+    </section>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>

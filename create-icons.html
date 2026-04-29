@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<!-- Open this file in a browser, then click the button to download PNG icons -->
+<html>
+<head><meta charset="UTF-8"><title>Icon Generator</title></head>
+<body>
+<button onclick="generate()">Generate & Download Icons</button>
+<script>
+function drawIcon(size) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#4285f4";
+  ctx.beginPath();
+  ctx.arc(size/2, size/2, size/2, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.arc(size/2, size*0.35, size*0.22, Math.PI, 0);
+  ctx.lineTo(size*0.78, size*0.68);
+  ctx.lineTo(size*0.22, size*0.68);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(size/2, size*0.73, size*0.08, 0, Math.PI*2);
+  ctx.fill();
+
+  return canvas;
+}
+
+function generate() {
+  for (const size of [16, 48, 128]) {
+    const canvas = drawIcon(size);
+    const a = document.createElement("a");
+    a.download = `icon${size}.png`;
+    a.href = canvas.toDataURL("image/png");
+    a.click();
+  }
+}
+</script>
+</body>
+</html>
