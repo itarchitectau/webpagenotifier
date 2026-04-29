@@ -12,6 +12,21 @@
   <div class="container">
     <h1>Element Notifier</h1>
     <div id="summary"></div>
+
+    <div class="card">
+      <h2>Auto-Refresh This Tab</h2>
+      <p class="hint">Reload this tab on a timer so new page content is checked for matching elements.</p>
+      <p id="refreshStatus" class="status"></p>
+      <label>
+        Interval (seconds, min 30)
+        <input type="number" id="refreshInterval" min="30" value="60" />
+      </label>
+      <div class="btn-row">
+        <button id="enableRefresh">Enable</button>
+        <button id="disableRefresh" class="secondary" style="display:none">Disable</button>
+      </div>
+    </div>
+
     <div class="btn-row">
       <button id="openOptions">Open Settings</button>
     </div>

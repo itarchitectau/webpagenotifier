@@ -82,6 +82,22 @@ async function handleElementFound({ ruleId, ruleLabel, selector, matchedText, pr
   }
 }
 
+// Auto-refresh: reload tab on alarm
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (!alarm.name.startsWith("refresh-")) return;
+  const tabId = parseInt(alarm.name.slice(8), 10);
+  if (isNaN(tabId)) return;
+  try {
+    await chrome.tabs.reload(tabId);
+  } catch {
+    // Tab was closed; clean up orphaned alarm and session state
+    chrome.alarms.clear(alarm.name);
+    const { tabRefresh = {} } = await chrome.storage.session.get("tabRefresh");
+    delete tabRefresh[tabId];
+    chrome.storage.session.set({ tabRefresh });
+  }
+});
+
 // Clear deduplication entries when a tab navigates to a new URL or closes
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.status === "loading") {
@@ -89,8 +105,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   }
 });
 
-chrome.tabs.onRemoved.addListener((tabId) => {
+chrome.tabs.onRemoved.addListener(async (tabId) => {
   clearTabDedupeEntries(tabId);
+  chrome.alarms.clear(`refresh-${tabId}`);
+  const { tabRefresh = {} } = await chrome.storage.session.get("tabRefresh");
+  if (tabId in tabRefresh) {
+    delete tabRefresh[tabId];
+    chrome.storage.session.set({ tabRefresh });
+  }
 });
 
 async function clearTabDedupeEntries(tabId) {

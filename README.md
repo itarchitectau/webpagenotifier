@@ -14,6 +14,7 @@ A Chrome extension that monitors CSS-selected HTML elements on any web page and 
 2. The extension injects a content script into every page that uses a `MutationObserver` to watch for matching elements — both on initial load and as the DOM changes dynamically.
 3. When a match is found, the background service worker sends a push notification to your device via the Pushover API.
 4. Notifications are rate-limited by a configurable **cooldown interval** (default 1 hour). If the element is still present after the cooldown expires, a new notification is sent automatically.
+5. Optionally, enable **Auto-Refresh** from the popup to reload the tab on a timer — useful for pages that require a full reload to surface new content.
 
 ## Project structure
 
@@ -22,7 +23,7 @@ test-notifier/
 ├── manifest.json        # Chrome Manifest V3 declaration
 ├── background.js        # Service worker: receives match events, calls Pushover API
 ├── content.js           # Injected into every page: DOM watching via MutationObserver
-├── popup.html / .js     # Toolbar popup: shows Pushover status and active rules
+├── popup.html / .js     # Toolbar popup: shows Pushover status, active rules, and auto-refresh controls
 ├── options.html / .js   # Settings page: manage Pushover credentials and rules
 ├── styles.css           # Shared styles for popup and options pages
 ├── icons/               # Extension icons (16px, 48px, 128px PNG)
@@ -138,6 +139,30 @@ Each Pushover notification includes:
 - **Message:** the page title, the matched element's visible text (up to 200 characters), and the page URL
 - **Link:** a direct link back to the page
 
+## Auto-Refresh
+
+Some pages don't update their DOM dynamically — they require a full reload to surface new content (e.g. stock pages, booking systems). The Auto-Refresh feature reloads a specific tab on a configurable timer so the content script can check for matching elements after each reload.
+
+### Enabling auto-refresh
+
+1. Navigate to the tab you want to keep fresh.
+2. Click the extension icon to open the popup.
+3. In the **Auto-Refresh This Tab** section, set the interval in seconds (minimum 30).
+4. Click **Enable**.
+
+The popup shows the current status (`Active — every Xs` in green, or `Disabled`). While active, the **Enable** button becomes **Update**, so you can change the interval without disabling first.
+
+### Behaviour
+
+| Detail | Notes |
+|---|---|
+| Scope | Per-tab — each tab has its own independent refresh timer |
+| Persistence | Survives the popup closing and service worker sleep/wake cycles; cleared on browser restart |
+| Tab closure | The timer is automatically cancelled when the tab is closed |
+| Minimum interval | 30 seconds (Chrome may enforce ~60 s in practice) |
+
+Auto-refresh and the notification cooldown work independently. A typical setup: set auto-refresh to 60 s and the notification cooldown to 3600 s — the page reloads every minute, but you receive at most one notification per hour per rule.
+
 ## Managing rules
 
 In the Settings page you can:
@@ -150,6 +175,7 @@ In the Settings page you can:
 
 - No build step or bundler is required — all files are plain vanilla JavaScript loaded directly by Chrome.
 - Rule, credential, and cooldown data are stored in `chrome.storage.sync`, so they sync across devices signed into the same Chrome profile.
+- Auto-refresh state is stored in `chrome.storage.session` (ephemeral, per-session) and auto-refresh alarms are named `refresh-{tabId}`. Both are cleaned up automatically when the tab closes or the browser restarts.
 - The deduplication key is `tabId:ruleId`, stored with a timestamp. A notification is suppressed only while `Date.now() - lastSent < cooldownMs`; once the window passes the notification fires again automatically.
 - The content script sets a `setInterval` at the configured cooldown interval so elements that are already present in the DOM (and don't trigger a `MutationObserver` event) are still re-checked and re-notified.
 - The Pushover API call is made from the background service worker to avoid CORS issues.
@@ -161,6 +187,8 @@ In the Settings page you can:
 | No notification received | Open Settings and verify both Pushover credentials are saved. Check the service worker console at `chrome://extensions` → *Inspect views: service worker*. |
 | "Invalid CSS selector" error | Test your selector in the browser DevTools console: `document.querySelector('your-selector')`. |
 | Notification fires only once then stops | Check the cooldown setting in Settings — the default is 1 hour. Lower it to get more frequent notifications. |
+| Page is not refreshing automatically | Open the popup and confirm the Auto-Refresh status shows green. If the tab was closed and reopened, auto-refresh must be re-enabled — it does not persist across browser restarts. |
+| Auto-refresh interval shorter than expected | Chrome enforces a minimum alarm period of approximately 30–60 seconds for extensions. |
 | Extension not loading | Ensure the `icons/` folder contains all three PNG files, then reload the extension at `chrome://extensions`. |
 
 ## Privacy
