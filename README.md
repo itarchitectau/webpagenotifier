@@ -25,7 +25,7 @@ test-notifier/
 ├── background.js        # Service worker: receives match events, calls Pushover or Telegram API
 ├── content.js           # Injected into every page: DOM watching via MutationObserver
 ├── popup.html / .js     # Toolbar popup: shows channel status, active rules, and auto-refresh controls
-├── options.html / .js   # Settings page: manage notification channel, credentials, quiet hours, and rules
+├── options.html / .js   # Settings page: manage notification channel, credentials, quiet hours, rules, and export/import
 ├── styles.css           # Shared styles for popup and options pages
 ├── icons/               # Extension icons (16px, 48px, 128px PNG)
 ├── create-icons.html    # Browser-based icon generator (no dependencies)
@@ -227,6 +227,46 @@ In the Settings page you can:
 - **Disable / Enable** a rule to pause it temporarily
 - **Delete** a rule to remove it permanently
 
+## Export / Import
+
+The **Export / Import** card at the bottom of the Settings page lets you back up your configuration or transfer it to another machine.
+
+### Exporting
+
+Click **Export Configuration** to download a `page-notifier-config.json` file containing all current settings:
+
+- Notification channel selection
+- Pushover and Telegram credentials
+- Notification cooldown
+- Quiet hours settings
+- All monitoring rules
+
+The file uses a simple JSON envelope:
+
+```json
+{
+  "version": 1,
+  "exported": "2026-05-01T10:00:00.000Z",
+  "config": { ... }
+}
+```
+
+### Importing
+
+1. Click **Open Settings** on the target machine.
+2. Scroll to **Export / Import** and select your `.json` file.
+3. Click **Import Configuration**.
+4. Confirm the prompt — all current settings will be replaced.
+
+The settings page reloads automatically once the import completes.
+
+### What is not exported
+
+| Excluded | Reason |
+|---|---|
+| Notification deduplication timestamps | Machine/session specific; would block notifications on the new machine |
+| Auto-refresh state | Tab-level, session-scoped — does not make sense to transfer |
+
 ## Development notes
 
 - No build step or bundler is required — all files are plain vanilla JavaScript loaded directly by Chrome.
@@ -247,6 +287,7 @@ In the Settings page you can:
 | Notification fires only once then stops | Check the cooldown setting in Settings — the default is 1 hour. Lower it to get more frequent notifications. |
 | Page is not refreshing automatically | Open the popup and confirm the Auto-Refresh status shows green. If the tab was closed and reopened, auto-refresh must be re-enabled — it does not persist across browser restarts. |
 | Auto-refresh interval shorter than expected | Chrome enforces a minimum alarm period of approximately 30–60 seconds for extensions. |
+| Import has no effect | Ensure the file was exported by this extension. The importer silently skips unrecognised keys — if no known keys are found it will show an error. |
 | Extension not loading | Ensure the `icons/` folder contains all three PNG files, then reload the extension at `chrome://extensions`. |
 
 ## Privacy

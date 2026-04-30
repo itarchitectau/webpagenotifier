@@ -123,6 +123,29 @@
         <p class="status" id="ruleStatus"></p>
       </div>
     </section>
+
+    <section class="card">
+      <h2>Export / Import</h2>
+      <p class="hint">Back up your configuration or transfer it to another machine. Credentials, rules, quiet hours, and channel settings are included. Auto-refresh state is not exported.</p>
+
+      <div class="btn-row">
+        <button id="exportConfig">Export Configuration</button>
+      </div>
+
+      <div class="card-inner" style="margin-top:12px">
+        <h3>Import</h3>
+        <p class="hint">Importing will overwrite all current settings and rules.</p>
+        <label>
+          Configuration file (.json)
+          <input type="file" id="importFile" accept=".json" />
+        </label>
+        <div class="btn-row">
+          <button id="importConfig">Import Configuration</button>
+        </div>
+      </div>
+
+      <p class="status" id="exportImportStatus"></p>
+    </section>
   </div>
   <script src="options.js"></script>
 </body>

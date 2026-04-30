@@ -2,6 +2,15 @@ const $ = (id) => document.getElementById(id);
 
 const PRIORITY_LABELS = { "0": "Normal", "1": "High", "2": "Emergency" };
 
+const CONFIG_KEYS = [
+  "notificationChannel",
+  "pushoverUserKey", "pushoverAppToken",
+  "telegramBotToken", "telegramChatId",
+  "dedupeIntervalSecs",
+  "quietHoursEnabled", "quietHoursStart", "quietHoursEnd",
+  "rules",
+];
+
 let rules = [];
 
 function updateChannelFields() {
@@ -195,6 +204,58 @@ async function saveQuietHours() {
   showStatus("quietHoursStatus", "Quiet hours saved.", "ok");
 }
 
+async function exportConfig() {
+  const data = await chrome.storage.sync.get(CONFIG_KEYS);
+  const payload = JSON.stringify({ version: 1, exported: new Date().toISOString(), config: data }, null, 2);
+  const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "page-notifier-config.json";
+  a.click();
+  URL.revokeObjectURL(url);
+  showStatus("exportImportStatus", "Configuration exported.", "ok");
+}
+
+async function importConfig() {
+  const file = $("importFile").files[0];
+  if (!file) {
+    showStatus("exportImportStatus", "Please select a file first.", "error");
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(await file.text());
+  } catch {
+    showStatus("exportImportStatus", "Invalid JSON file.", "error");
+    return;
+  }
+
+  const config = parsed.config ?? parsed;
+  if (typeof config !== "object" || config === null || Array.isArray(config)) {
+    showStatus("exportImportStatus", "Unrecognised configuration format.", "error");
+    return;
+  }
+
+  const toImport = {};
+  for (const key of CONFIG_KEYS) {
+    if (key in config) toImport[key] = config[key];
+  }
+
+  if (Object.keys(toImport).length === 0) {
+    showStatus("exportImportStatus", "No recognised settings found in file.", "error");
+    return;
+  }
+
+  if (!confirm("This will overwrite all current settings and rules. Continue?")) return;
+
+  await chrome.storage.sync.set(toImport);
+  showStatus("exportImportStatus", "Configuration imported — reloading settings…", "ok");
+  setTimeout(load, 1000);
+}
+
+$("exportConfig").addEventListener("click", exportConfig);
+$("importConfig").addEventListener("click", importConfig);
 $("saveCredentials").addEventListener("click", saveCredentials);
 $("notificationChannel").addEventListener("change", updateChannelFields);
 $("quietHoursEnabled").addEventListener("change", updateQuietHoursFields);
