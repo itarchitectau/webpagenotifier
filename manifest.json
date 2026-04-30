@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Page Element Notifier",
   "version": "1.0.0",
-  "description": "Monitors HTML elements on a page and sends Pushover notifications when they appear.",
+  "description": "Monitors CSS-selected elements on any page and sends notifications via Pushover or Telegram. Supports quiet hours, per-tab auto-refresh, and configurable cooldown intervals.",
   "permissions": [
     "storage",
     "activeTab",

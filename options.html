@@ -10,16 +10,41 @@
     <h1>Settings</h1>
 
     <section class="card">
-      <h2>Pushover Credentials</h2>
+      <h2>Notification Channel</h2>
       <label>
-        User Key
-        <input type="text" id="userKey" placeholder="your-pushover-user-key" />
+        Active channel
+        <select id="notificationChannel">
+          <option value="pushover">Pushover</option>
+          <option value="telegram">Telegram</option>
+        </select>
       </label>
-      <label>
-        App Token
-        <input type="text" id="appToken" placeholder="your-app-api-token" />
-      </label>
-      <label>
+
+      <div id="pushoverFields" class="card-inner">
+        <h3>Pushover</h3>
+        <label>
+          User Key
+          <input type="text" id="userKey" placeholder="your-pushover-user-key" />
+        </label>
+        <label>
+          App Token
+          <input type="text" id="appToken" placeholder="your-app-api-token" />
+        </label>
+      </div>
+
+      <div id="telegramFields" class="card-inner" style="display:none">
+        <h3>Telegram</h3>
+        <span class="hint">Create a bot via <strong>@BotFather</strong>, then send it a message and visit <code>https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code> to find your Chat ID.</span>
+        <label>
+          Bot Token
+          <input type="text" id="telegramBotToken" placeholder="123456:ABC-DEF..." />
+        </label>
+        <label>
+          Chat ID
+          <input type="text" id="telegramChatId" placeholder="your-chat-id" />
+        </label>
+      </div>
+
+      <label style="margin-top:12px">
         Notification Cooldown (seconds)
         <input type="number" id="dedupeIntervalSecs" min="1" placeholder="3600" />
         <span class="hint">Minimum time between repeat notifications for the same rule on the same tab. Default: 3600 (1 hour).</span>
@@ -29,8 +54,32 @@
     </section>
 
     <section class="card">
+      <h2>Quiet Hours</h2>
+      <p class="hint">Suppress all notifications during the specified time window, regardless of channel or rule.</p>
+      <label class="row">
+        <input type="checkbox" id="quietHoursEnabled" />
+        Enable quiet hours
+      </label>
+      <div id="quietHoursFields" style="display:none" class="card-inner">
+        <label>
+          Start time
+          <input type="time" id="quietHoursStart" value="22:00" />
+        </label>
+        <label>
+          End time
+          <input type="time" id="quietHoursEnd" value="07:00" />
+        </label>
+        <span class="hint">Times are in your local timezone. Set end time before start time to span midnight (e.g. 22:00 to 07:00).</span>
+      </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button id="saveQuietHours">Save Quiet Hours</button>
+      </div>
+      <p class="status" id="quietHoursStatus"></p>
+    </section>
+
+    <section class="card">
       <h2>Monitoring Rules</h2>
-      <p class="hint">Each rule watches for a CSS selector on every page and fires a Pushover notification when it appears.</p>
+      <p class="hint">Each rule watches for a CSS selector on every page and fires a notification via the active channel when it appears.</p>
 
       <div id="rulesList"></div>
 
@@ -46,7 +95,7 @@
           <input type="text" id="ruleSelector" placeholder="e.g. .alert-banner, #error-msg" />
         </label>
         <label>
-          Notification Priority
+          Notification Priority <span class="hint" style="font-weight:normal;display:inline">(Pushover only)</span>
           <select id="rulePriority">
             <option value="0">Normal</option>
             <option value="1">High — bypasses quiet hours</option>

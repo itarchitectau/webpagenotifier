@@ -1,18 +1,48 @@
+function isInQuietHours(start, end) {
+  const now = new Date();
+  const current = now.getHours() * 60 + now.getMinutes();
+  const [startH, startM] = start.split(":").map(Number);
+  const [endH, endM] = end.split(":").map(Number);
+  const startMins = startH * 60 + startM;
+  const endMins = endH * 60 + endM;
+  if (startMins === endMins) return false;
+  if (startMins < endMins) return current >= startMins && current < endMins;
+  return current >= startMins || current < endMins;
+}
+
 async function render() {
-  const { rules = [], pushoverUserKey, pushoverAppToken } = await chrome.storage.sync.get([
-    "rules",
-    "pushoverUserKey",
-    "pushoverAppToken",
+  const {
+    rules = [],
+    notificationChannel = "pushover",
+    pushoverUserKey, pushoverAppToken,
+    telegramBotToken, telegramChatId,
+    quietHoursEnabled, quietHoursStart = "22:00", quietHoursEnd = "07:00",
+  } = await chrome.storage.sync.get([
+    "rules", "notificationChannel",
+    "pushoverUserKey", "pushoverAppToken",
+    "telegramBotToken", "telegramChatId",
+    "quietHoursEnabled", "quietHoursStart", "quietHoursEnd",
   ]);
 
   const summary = document.getElementById("summary");
-  const credOk = pushoverUserKey && pushoverAppToken;
   const activeRules = rules.filter((r) => r.enabled !== false);
+
+  let credOk, channelLabel;
+  if (notificationChannel === "telegram") {
+    credOk = telegramBotToken && telegramChatId;
+    channelLabel = "Telegram";
+  } else {
+    credOk = pushoverUserKey && pushoverAppToken;
+    channelLabel = "Pushover";
+  }
+
+  const quietNow = quietHoursEnabled && isInQuietHours(quietHoursStart, quietHoursEnd);
 
   summary.innerHTML = `
     <p class="${credOk ? "ok" : "error"}">
-      Pushover: ${credOk ? "Configured" : "Not configured"}
+      ${channelLabel}: ${credOk ? "Configured" : "Not configured"}
     </p>
+    ${quietNow ? `<p class="error">Quiet hours active (${esc(quietHoursStart)}–${esc(quietHoursEnd)}) — notifications paused</p>` : ""}
     <p>${activeRules.length} active rule${activeRules.length !== 1 ? "s" : ""}</p>
     ${
       activeRules.length > 0

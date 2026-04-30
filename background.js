@@ -1,4 +1,5 @@
 const PUSHOVER_API_URL = "https://api.pushover.net/1/messages.json";
+const TELEGRAM_API_BASE = "https://api.telegram.org";
 const DEFAULT_DEDUPE_INTERVAL_SECS = 3600;
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -21,13 +22,25 @@ async function handleElementFound({ ruleId, ruleLabel, selector, matchedText, pr
   const {
     pushoverUserKey,
     pushoverAppToken,
+    telegramBotToken,
+    telegramChatId,
+    notificationChannel = "pushover",
     sentNotifications = {},
     dedupeIntervalSecs = DEFAULT_DEDUPE_INTERVAL_SECS,
+    quietHoursEnabled,
+    quietHoursStart = "22:00",
+    quietHoursEnd = "07:00",
   } = await chrome.storage.sync.get([
     "pushoverUserKey",
     "pushoverAppToken",
+    "telegramBotToken",
+    "telegramChatId",
+    "notificationChannel",
     "sentNotifications",
     "dedupeIntervalSecs",
+    "quietHoursEnabled",
+    "quietHoursStart",
+    "quietHoursEnd",
   ]);
 
   // Time-based deduplication: skip if last notification for this rule+tab is within the cooldown window
@@ -35,51 +48,106 @@ async function handleElementFound({ ruleId, ruleLabel, selector, matchedText, pr
   const lastSent = sentNotifications[dedupeKey];
   if (lastSent && Date.now() - lastSent < dedupeIntervalSecs * 1000) return;
 
-  if (!pushoverUserKey || !pushoverAppToken) {
-    console.warn("[Notifier] Pushover credentials not configured.");
+  if (quietHoursEnabled && isInQuietHours(quietHoursStart, quietHoursEnd)) {
+    console.log("[Notifier] Quiet hours active — notification suppressed.");
     return;
   }
 
   const title = ruleLabel || `Element found: ${selector}`;
-  const body = [
+  const lines = [
     `Page: ${tab.title || tab.url}`,
     matchedText ? `Text: ${matchedText.slice(0, 200)}` : null,
     `URL: ${tab.url}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  ].filter(Boolean);
 
+  let succeeded = false;
+  if (notificationChannel === "pushover") {
+    if (!pushoverUserKey || !pushoverAppToken) {
+      console.warn("[Notifier] Pushover credentials not configured.");
+      return;
+    }
+    succeeded = await sendPushover({ token: pushoverAppToken, user: pushoverUserKey, title, lines, url: tab.url, priority, retry, expire });
+  } else if (notificationChannel === "telegram") {
+    if (!telegramBotToken || !telegramChatId) {
+      console.warn("[Notifier] Telegram credentials not configured.");
+      return;
+    }
+    succeeded = await sendTelegram({ botToken: telegramBotToken, chatId: telegramChatId, title, lines, url: tab.url });
+  }
+
+  if (succeeded) {
+    sentNotifications[dedupeKey] = Date.now();
+    await chrome.storage.sync.set({ sentNotifications });
+    console.log("[Notifier] Notification sent for rule:", ruleId);
+  }
+}
+
+async function sendPushover({ token, user, title, lines, url, priority, retry, expire }) {
   try {
     const resp = await fetch(PUSHOVER_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        token: pushoverAppToken,
-        user: pushoverUserKey,
+        token,
+        user,
         title,
-        message: body,
-        url: tab.url,
+        message: lines.join("\n"),
+        url,
         url_title: "Open page",
         priority: priority ?? 0,
-        ...(priority === 2 && {
-          retry: retry ?? 60,
-          expire: expire ?? 3600,
-        }),
+        ...(priority === 2 && { retry: retry ?? 60, expire: expire ?? 3600 }),
       }),
     });
-
     if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      console.error("[Notifier] Pushover error:", err);
-      return;
+      console.error("[Notifier] Pushover error:", await resp.json().catch(() => ({})));
+      return false;
     }
-
-    sentNotifications[dedupeKey] = Date.now();
-    await chrome.storage.sync.set({ sentNotifications });
-    console.log("[Notifier] Notification sent for rule:", ruleId);
+    return true;
   } catch (e) {
-    console.error("[Notifier] Failed to send Pushover notification:", e);
+    console.error("[Notifier] Pushover request failed:", e);
+    return false;
   }
+}
+
+async function sendTelegram({ botToken, chatId, title, lines, url }) {
+  const text = [
+    `<b>${escHtml(title)}</b>`,
+    ...lines.map(escHtml),
+    `<a href="${escHtml(url)}">Open page</a>`,
+  ].join("\n");
+
+  try {
+    const resp = await fetch(`${TELEGRAM_API_BASE}/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true }),
+    });
+    if (!resp.ok) {
+      console.error("[Notifier] Telegram error:", await resp.json().catch(() => ({})));
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("[Notifier] Telegram request failed:", e);
+    return false;
+  }
+}
+
+function isInQuietHours(start, end) {
+  const now = new Date();
+  const current = now.getHours() * 60 + now.getMinutes();
+  const [startH, startM] = start.split(":").map(Number);
+  const [endH, endM] = end.split(":").map(Number);
+  const startMins = startH * 60 + startM;
+  const endMins = endH * 60 + endM;
+  if (startMins === endMins) return false;
+  if (startMins < endMins) return current >= startMins && current < endMins;
+  // spans midnight
+  return current >= startMins || current < endMins;
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 // Auto-refresh: reload tab on alarm

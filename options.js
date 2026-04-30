@@ -4,12 +4,35 @@ const PRIORITY_LABELS = { "0": "Normal", "1": "High", "2": "Emergency" };
 
 let rules = [];
 
+function updateChannelFields() {
+  const channel = $("notificationChannel").value;
+  $("pushoverFields").style.display = channel === "pushover" ? "" : "none";
+  $("telegramFields").style.display = channel === "telegram" ? "" : "none";
+}
+
+function updateQuietHoursFields() {
+  $("quietHoursFields").style.display = $("quietHoursEnabled").checked ? "" : "none";
+}
+
 async function load() {
-  const data = await chrome.storage.sync.get(["pushoverUserKey", "pushoverAppToken", "dedupeIntervalSecs", "rules"]);
+  const data = await chrome.storage.sync.get([
+    "pushoverUserKey", "pushoverAppToken",
+    "telegramBotToken", "telegramChatId",
+    "notificationChannel", "dedupeIntervalSecs", "rules",
+    "quietHoursEnabled", "quietHoursStart", "quietHoursEnd",
+  ]);
+  $("notificationChannel").value = data.notificationChannel || "pushover";
   $("userKey").value = data.pushoverUserKey || "";
   $("appToken").value = data.pushoverAppToken || "";
+  $("telegramBotToken").value = data.telegramBotToken || "";
+  $("telegramChatId").value = data.telegramChatId || "";
   $("dedupeIntervalSecs").value = data.dedupeIntervalSecs ?? 3600;
+  $("quietHoursEnabled").checked = data.quietHoursEnabled || false;
+  $("quietHoursStart").value = data.quietHoursStart || "22:00";
+  $("quietHoursEnd").value = data.quietHoursEnd || "07:00";
   rules = data.rules || [];
+  updateChannelFields();
+  updateQuietHoursFields();
   renderRules();
 }
 
@@ -142,11 +165,14 @@ async function deleteRule(id) {
 }
 
 async function saveCredentials() {
+  const notificationChannel = $("notificationChannel").value;
   const pushoverUserKey = $("userKey").value.trim();
   const pushoverAppToken = $("appToken").value.trim();
+  const telegramBotToken = $("telegramBotToken").value.trim();
+  const telegramChatId = $("telegramChatId").value.trim();
   const dedupeIntervalSecs = Math.max(1, parseInt($("dedupeIntervalSecs").value, 10) || 3600);
   $("dedupeIntervalSecs").value = dedupeIntervalSecs;
-  await chrome.storage.sync.set({ pushoverUserKey, pushoverAppToken, dedupeIntervalSecs });
+  await chrome.storage.sync.set({ notificationChannel, pushoverUserKey, pushoverAppToken, telegramBotToken, telegramChatId, dedupeIntervalSecs });
   showStatus("credStatus", "Credentials saved.", "ok");
 }
 
@@ -161,7 +187,18 @@ function escHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+async function saveQuietHours() {
+  const quietHoursEnabled = $("quietHoursEnabled").checked;
+  const quietHoursStart = $("quietHoursStart").value || "22:00";
+  const quietHoursEnd = $("quietHoursEnd").value || "07:00";
+  await chrome.storage.sync.set({ quietHoursEnabled, quietHoursStart, quietHoursEnd });
+  showStatus("quietHoursStatus", "Quiet hours saved.", "ok");
+}
+
 $("saveCredentials").addEventListener("click", saveCredentials);
+$("notificationChannel").addEventListener("change", updateChannelFields);
+$("quietHoursEnabled").addEventListener("change", updateQuietHoursFields);
+$("saveQuietHours").addEventListener("click", saveQuietHours);
 $("saveRule").addEventListener("click", saveRule);
 $("cancelEdit").addEventListener("click", cancelEdit);
 $("rulePriority").addEventListener("change", () => {
