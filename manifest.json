@@ -8,7 +8,8 @@
     "activeTab",
     "scripting",
     "alarms",
-    "tabs"
+    "tabs",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -25,6 +26,11 @@
     }
   },
   "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["ua-inject.js"],
+      "run_at": "document_start"
+    },
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],

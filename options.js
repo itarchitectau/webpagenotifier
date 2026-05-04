@@ -2,7 +2,23 @@ const $ = (id) => document.getElementById(id);
 
 const PRIORITY_LABELS = { "0": "Normal", "1": "High", "2": "Emergency" };
 
+const USER_AGENTS = [
+  { label: "Default (no override)", value: "" },
+  { label: "Chrome 124 — Windows 11", value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" },
+  { label: "Chrome 124 — macOS", value: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" },
+  { label: "Chrome 124 — Linux", value: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" },
+  { label: "Firefox 125 — Windows", value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0" },
+  { label: "Firefox 125 — macOS", value: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.4; rv:125.0) Gecko/20100101 Firefox/125.0" },
+  { label: "Safari 17 — macOS", value: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15" },
+  { label: "Edge 124 — Windows", value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0" },
+  { label: "Safari — iPhone (iOS 17)", value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1" },
+  { label: "Chrome — Android (Pixel 8)", value: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36" },
+  { label: "Googlebot 2.1", value: "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" },
+  { label: "Custom…", value: "__custom__" },
+];
+
 const CONFIG_KEYS = [
+  "userAgent",
   "notificationChannel",
   "pushoverUserKey", "pushoverAppToken",
   "telegramBotToken", "telegramChatId",
@@ -12,6 +28,31 @@ const CONFIG_KEYS = [
 ];
 
 let rules = [];
+
+function buildUaPreset() {
+  const sel = $("uaPreset");
+  sel.innerHTML = USER_AGENTS.map((ua) =>
+    `<option value="${escHtml(ua.value)}">${escHtml(ua.label)}</option>`
+  ).join("");
+}
+
+function updateUaCustomField() {
+  $("uaCustomField").style.display = $("uaPreset").value === "__custom__" ? "" : "none";
+}
+
+function loadUserAgentField(stored) {
+  buildUaPreset();
+  const preset = USER_AGENTS.find((ua) => ua.value === stored && ua.value !== "__custom__");
+  if (!stored) {
+    $("uaPreset").value = "";
+  } else if (preset) {
+    $("uaPreset").value = stored;
+  } else {
+    $("uaPreset").value = "__custom__";
+    $("uaCustom").value = stored;
+  }
+  updateUaCustomField();
+}
 
 function updateChannelFields() {
   const channel = $("notificationChannel").value;
@@ -25,11 +66,13 @@ function updateQuietHoursFields() {
 
 async function load() {
   const data = await chrome.storage.sync.get([
+    "userAgent",
     "pushoverUserKey", "pushoverAppToken",
     "telegramBotToken", "telegramChatId",
     "notificationChannel", "dedupeIntervalSecs", "rules",
     "quietHoursEnabled", "quietHoursStart", "quietHoursEnd",
   ]);
+  loadUserAgentField(data.userAgent || "");
   $("notificationChannel").value = data.notificationChannel || "pushover";
   $("userKey").value = data.pushoverUserKey || "";
   $("appToken").value = data.pushoverAppToken || "";
@@ -204,6 +247,13 @@ async function saveQuietHours() {
   showStatus("quietHoursStatus", "Quiet hours saved.", "ok");
 }
 
+async function saveUserAgent() {
+  const preset = $("uaPreset").value;
+  const userAgent = preset === "__custom__" ? $("uaCustom").value.trim() : preset;
+  await chrome.storage.sync.set({ userAgent });
+  showStatus("uaStatus", userAgent ? "User agent saved." : "User agent reset to default.", "ok");
+}
+
 async function exportConfig() {
   const data = await chrome.storage.sync.get(CONFIG_KEYS);
   const payload = JSON.stringify({ version: 1, exported: new Date().toISOString(), config: data }, null, 2);
@@ -254,6 +304,8 @@ async function importConfig() {
   setTimeout(load, 1000);
 }
 
+$("saveUserAgent").addEventListener("click", saveUserAgent);
+$("uaPreset").addEventListener("change", updateUaCustomField);
 $("exportConfig").addEventListener("click", exportConfig);
 $("importConfig").addEventListener("click", importConfig);
 $("saveCredentials").addEventListener("click", saveCredentials);

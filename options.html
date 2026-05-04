@@ -54,6 +54,25 @@
     </section>
 
     <section class="card">
+      <h2>User Agent</h2>
+      <p class="hint">Override the browser's User-Agent sent to websites. Useful for monitoring pages that serve different content to different browsers or block automation.</p>
+      <label>
+        Preset
+        <select id="uaPreset"></select>
+      </label>
+      <div id="uaCustomField" style="display:none">
+        <label>
+          Custom User-Agent string
+          <input type="text" id="uaCustom" placeholder="Mozilla/5.0 …" />
+        </label>
+      </div>
+      <div class="btn-row">
+        <button id="saveUserAgent">Save User Agent</button>
+      </div>
+      <p class="status" id="uaStatus"></p>
+    </section>
+
+    <section class="card">
       <h2>Quiet Hours</h2>
       <p class="hint">Suppress all notifications during the specified time window, regardless of channel or rule.</p>
       <label class="row">

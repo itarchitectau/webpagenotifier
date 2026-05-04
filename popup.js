@@ -17,11 +17,13 @@ async function render() {
     pushoverUserKey, pushoverAppToken,
     telegramBotToken, telegramChatId,
     quietHoursEnabled, quietHoursStart = "22:00", quietHoursEnd = "07:00",
+    userAgent = "",
   } = await chrome.storage.sync.get([
     "rules", "notificationChannel",
     "pushoverUserKey", "pushoverAppToken",
     "telegramBotToken", "telegramChatId",
     "quietHoursEnabled", "quietHoursStart", "quietHoursEnd",
+    "userAgent",
   ]);
 
   const summary = document.getElementById("summary");
@@ -43,6 +45,7 @@ async function render() {
       ${channelLabel}: ${credOk ? "Configured" : "Not configured"}
     </p>
     ${quietNow ? `<p class="error">Quiet hours active (${esc(quietHoursStart)}–${esc(quietHoursEnd)}) — notifications paused</p>` : ""}
+    ${userAgent ? `<p class="hint" style="margin-bottom:4px">UA override active</p>` : ""}
     <p>${activeRules.length} active rule${activeRules.length !== 1 ? "s" : ""}</p>
     ${
       activeRules.length > 0

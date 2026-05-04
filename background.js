@@ -1,6 +1,7 @@
 const PUSHOVER_API_URL = "https://api.pushover.net/1/messages.json";
 const TELEGRAM_API_BASE = "https://api.telegram.org";
 const DEFAULT_DEDUPE_INTERVAL_SECS = 3600;
+const UA_RULE_ID = 1;
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.sync.get("rules", (data) => {
@@ -8,7 +9,30 @@ chrome.runtime.onInstalled.addListener(() => {
       chrome.storage.sync.set({ rules: [] });
     }
   });
+  updateUserAgentRule();
 });
+
+chrome.runtime.onStartup.addListener(() => {
+  updateUserAgentRule();
+});
+
+async function updateUserAgentRule() {
+  const { userAgent = "" } = await chrome.storage.sync.get("userAgent");
+  await chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: [UA_RULE_ID],
+    addRules: userAgent ? [{
+      id: UA_RULE_ID,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [{ header: "User-Agent", operation: "set", value: userAgent }],
+      },
+      condition: {
+        resourceTypes: ["main_frame", "sub_frame", "stylesheet", "script", "image", "font", "object", "xmlhttprequest", "ping", "other"],
+      },
+    }] : [],
+  });
+}
 
 // Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -181,6 +205,10 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
     delete tabRefresh[tabId];
     chrome.storage.session.set({ tabRefresh });
   }
+});
+
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.userAgent) updateUserAgentRule();
 });
 
 async function clearTabDedupeEntries(tabId) {

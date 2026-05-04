@@ -15,17 +15,19 @@ A Chrome extension that monitors CSS-selected HTML elements on any web page and 
 3. When a match is found, the background service worker sends a push notification to your device via the configured channel (Pushover or Telegram).
 4. Notifications are rate-limited by a configurable **cooldown interval** (default 1 hour). If the element is still present after the cooldown expires, a new notification is sent automatically.
 5. Optionally configure **Quiet Hours** to suppress all notifications during a set time window (e.g. overnight).
-6. Optionally, enable **Auto-Refresh** from the popup to reload the tab on a timer — useful for pages that require a full reload to surface new content.
+6. Optionally override the browser's **User Agent** to present a different browser or device identity to monitored pages.
+7. Optionally, enable **Auto-Refresh** from the popup to reload the tab on a timer — useful for pages that require a full reload to surface new content.
 
 ## Project structure
 
 ```
 test-notifier/
 ├── manifest.json        # Chrome Manifest V3 declaration
-├── background.js        # Service worker: receives match events, calls Pushover or Telegram API
+├── background.js        # Service worker: match events, Pushover/Telegram API, UA rule management
 ├── content.js           # Injected into every page: DOM watching via MutationObserver
+├── ua-inject.js         # Injected at document_start: overrides navigator.userAgent in page JS context
 ├── popup.html / .js     # Toolbar popup: shows channel status, active rules, and auto-refresh controls
-├── options.html / .js   # Settings page: manage notification channel, credentials, quiet hours, rules, and export/import
+├── options.html / .js   # Settings page: channel, credentials, user agent, quiet hours, rules, export/import
 ├── styles.css           # Shared styles for popup and options pages
 ├── icons/               # Extension icons (16px, 48px, 128px PNG)
 ├── create-icons.html    # Browser-based icon generator (no dependencies)
@@ -172,6 +174,47 @@ Both channels receive the same information:
 
 Telegram messages are formatted with HTML (bold title, plain body lines, clickable link). Pushover messages include a native URL attachment that opens in the browser.
 
+## User Agent Override
+
+Some pages serve different content, block requests, or behave differently based on the browser's User-Agent string. The User Agent Override feature lets you present a different browser or device identity to monitored pages.
+
+### How it works
+
+The override operates at two levels simultaneously:
+
+| Level | Mechanism | What it affects |
+|---|---|---|
+| HTTP header | `declarativeNetRequest` dynamic rule | What the server sees in every request |
+| JavaScript | `navigator.userAgent` override via `document_start` script | What client-side JS reads from `navigator.userAgent` |
+
+### Configuring user agent
+
+1. Open **Settings** and scroll to the **User Agent** card.
+2. Select a preset from the dropdown, or choose **Custom…** and enter your own string.
+3. Click **Save User Agent**.
+
+The popup shows **UA override active** whenever an override is in effect.
+
+To disable the override, select **Default (no override)** and save.
+
+### Available presets
+
+| Preset | Platform |
+|---|---|
+| Chrome 124 | Windows 11, macOS, Linux |
+| Firefox 125 | Windows, macOS |
+| Safari 17 | macOS |
+| Edge 124 | Windows |
+| Safari | iPhone (iOS 17) |
+| Chrome | Android (Pixel 8) |
+| Googlebot 2.1 | — |
+| Custom… | Enter any UA string |
+
+### Limitations
+
+- The `navigator.userAgent` override is injected asynchronously at `document_start`. Pages that read the UA synchronously during very early script execution may still see the real value. The HTTP header override is not subject to this limitation.
+- The override applies to all tabs and all pages — it is not scoped to specific URLs or rules.
+
 ## Quiet Hours
 
 Quiet hours suppress all notifications during a configured daily time window, regardless of which channel or rule would have fired. This is useful for avoiding overnight or out-of-hours interruptions.
@@ -238,6 +281,7 @@ Click **Export Configuration** to download a `page-notifier-config.json` file co
 - Notification channel selection
 - Pushover and Telegram credentials
 - Notification cooldown
+- User agent override
 - Quiet hours settings
 - All monitoring rules
 
@@ -270,7 +314,8 @@ The settings page reloads automatically once the import completes.
 ## Development notes
 
 - No build step or bundler is required — all files are plain vanilla JavaScript loaded directly by Chrome.
-- Rule, credential, cooldown, active channel, and quiet hours data are stored in `chrome.storage.sync`, so they sync across devices signed into the same Chrome profile.
+- Rule, credential, cooldown, active channel, quiet hours, and user agent data are stored in `chrome.storage.sync`, so they sync across devices signed into the same Chrome profile.
+- The UA override uses a `declarativeNetRequest` dynamic rule (ID `1`) for the HTTP header and a `document_start` content script (`ua-inject.js`) for `navigator.userAgent`. The rule is re-applied on install and browser startup.
 - Auto-refresh state is stored in `chrome.storage.session` (ephemeral, per-session) and auto-refresh alarms are named `refresh-{tabId}`. Both are cleaned up automatically when the tab closes or the browser restarts.
 - The deduplication key is `tabId:ruleId`, stored with a timestamp. A notification is suppressed only while `Date.now() - lastSent < cooldownMs`; once the window passes the notification fires again automatically. The cooldown is shared across channels — switching channel mid-session does not reset it.
 - The content script sets a `setInterval` at the configured cooldown interval so elements that are already present in the DOM (and don't trigger a `MutationObserver` event) are still re-checked and re-notified.
@@ -287,6 +332,7 @@ The settings page reloads automatically once the import completes.
 | Notification fires only once then stops | Check the cooldown setting in Settings — the default is 1 hour. Lower it to get more frequent notifications. |
 | Page is not refreshing automatically | Open the popup and confirm the Auto-Refresh status shows green. If the tab was closed and reopened, auto-refresh must be re-enabled — it does not persist across browser restarts. |
 | Auto-refresh interval shorter than expected | Chrome enforces a minimum alarm period of approximately 30–60 seconds for extensions. |
+| User agent override not working | Reload the page after saving — the `declarativeNetRequest` rule applies to new requests only. Verify the override is active by checking `navigator.userAgent` in the browser DevTools console.  |
 | Import has no effect | Ensure the file was exported by this extension. The importer silently skips unrecognised keys — if no known keys are found it will show an error. |
 | Extension not loading | Ensure the `icons/` folder contains all three PNG files, then reload the extension at `chrome://extensions`. |
 
