@@ -184,7 +184,7 @@ The override operates at two levels simultaneously:
 
 | Level | Mechanism | What it affects |
 |---|---|---|
-| HTTP header | `declarativeNetRequest` dynamic rule | What the server sees in every request |
+| HTTP header | `declarativeNetRequestWithHostAccess` dynamic rule | What the server sees in every request (all resource types) |
 | JavaScript | `navigator.userAgent` override via `document_start` script | What client-side JS reads from `navigator.userAgent` |
 
 ### Configuring user agent
@@ -315,7 +315,7 @@ The settings page reloads automatically once the import completes.
 
 - No build step or bundler is required — all files are plain vanilla JavaScript loaded directly by Chrome.
 - Rule, credential, cooldown, active channel, quiet hours, and user agent data are stored in `chrome.storage.sync`, so they sync across devices signed into the same Chrome profile.
-- The UA override uses a `declarativeNetRequest` dynamic rule (ID `1`) for the HTTP header and a `document_start` content script (`ua-inject.js`) for `navigator.userAgent`. The rule is re-applied on install and browser startup.
+- The UA override uses a `declarativeNetRequestWithHostAccess` dynamic rule (ID `1`) with `urlFilter: "*"` covering all resource types (main frame, sub-frames, scripts, stylesheets, media, websockets, etc.) for the HTTP header, and a `document_start` content script (`ua-inject.js`) for `navigator.userAgent`. The rule is re-applied on install and browser startup.
 - Auto-refresh state is stored in `chrome.storage.session` (ephemeral, per-session) and auto-refresh alarms are named `refresh-{tabId}`. Both are cleaned up automatically when the tab closes or the browser restarts.
 - The deduplication key is `tabId:ruleId`, stored with a timestamp. A notification is suppressed only while `Date.now() - lastSent < cooldownMs`; once the window passes the notification fires again automatically. The cooldown is shared across channels — switching channel mid-session does not reset it.
 - The content script sets a `setInterval` at the configured cooldown interval so elements that are already present in the DOM (and don't trigger a `MutationObserver` event) are still re-checked and re-notified.
@@ -332,7 +332,7 @@ The settings page reloads automatically once the import completes.
 | Notification fires only once then stops | Check the cooldown setting in Settings — the default is 1 hour. Lower it to get more frequent notifications. |
 | Page is not refreshing automatically | Open the popup and confirm the Auto-Refresh status shows green. If the tab was closed and reopened, auto-refresh must be re-enabled — it does not persist across browser restarts. |
 | Auto-refresh interval shorter than expected | Chrome enforces a minimum alarm period of approximately 30–60 seconds for extensions. |
-| User agent override not working | Reload the page after saving — the `declarativeNetRequest` rule applies to new requests only. Verify the override is active by checking `navigator.userAgent` in the browser DevTools console.  |
+| User agent override not working | Reload the extension at `chrome://extensions` after any permission change, then reload the page. The `declarativeNetRequestWithHostAccess` rule applies to new requests only. Verify by checking `navigator.userAgent` in the browser DevTools console. |
 | Import has no effect | Ensure the file was exported by this extension. The importer silently skips unrecognised keys — if no known keys are found it will show an error. |
 | Extension not loading | Ensure the `icons/` folder contains all three PNG files, then reload the extension at `chrome://extensions`. |
 

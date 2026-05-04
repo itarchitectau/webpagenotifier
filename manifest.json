@@ -9,7 +9,7 @@
     "scripting",
     "alarms",
     "tabs",
-    "declarativeNetRequest"
+    "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": [
     "<all_urls>"

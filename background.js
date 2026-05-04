@@ -28,7 +28,8 @@ async function updateUserAgentRule() {
         requestHeaders: [{ header: "User-Agent", operation: "set", value: userAgent }],
       },
       condition: {
-        resourceTypes: ["main_frame", "sub_frame", "stylesheet", "script", "image", "font", "object", "xmlhttprequest", "ping", "other"],
+        urlFilter: "*",
+        resourceTypes: ["main_frame", "sub_frame", "stylesheet", "script", "image", "font", "object", "xmlhttprequest", "ping", "media", "websocket", "csp_report", "other"],
       },
     }] : [],
   });
