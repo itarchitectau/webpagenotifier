@@ -25,7 +25,6 @@ test-notifier/
 ├── manifest.json        # Chrome Manifest V3 declaration
 ├── background.js        # Service worker: match events, Pushover/Telegram API, UA rule management
 ├── content.js           # Injected into every page: DOM watching via MutationObserver
-├── ua-inject.js         # Injected at document_start: overrides navigator.userAgent in page JS context
 ├── popup.html / .js     # Toolbar popup: shows channel status, active rules, and auto-refresh controls
 ├── options.html / .js   # Settings page: channel, credentials, user agent, quiet hours, rules, export/import
 ├── styles.css           # Shared styles for popup and options pages
@@ -185,7 +184,7 @@ The override operates at two levels simultaneously:
 | Level | Mechanism | What it affects |
 |---|---|---|
 | HTTP header | `declarativeNetRequestWithHostAccess` dynamic rule | What the server sees in every request (all resource types) |
-| JavaScript | `navigator.userAgent` override via `document_start` script | What client-side JS reads from `navigator.userAgent` |
+| JavaScript | `chrome.scripting.executeScript` with `world: "MAIN"` injected on every page load | What client-side JS reads from `navigator.userAgent` |
 
 ### Configuring user agent
 
@@ -212,7 +211,7 @@ To disable the override, select **Default (no override)** and save.
 
 ### Limitations
 
-- The `navigator.userAgent` override is injected asynchronously at `document_start`. Pages that read the UA synchronously during very early script execution may still see the real value. The HTTP header override is not subject to this limitation.
+- The `navigator.userAgent` JavaScript override is injected via `chrome.scripting.executeScript` with `injectImmediately: true` when the tab starts loading. Pages that read the UA before the injection fires may still see the real value in rare edge cases. The HTTP header override is not subject to this limitation.
 - The override applies to all tabs and all pages — it is not scoped to specific URLs or rules.
 
 ## Quiet Hours
@@ -315,7 +314,7 @@ The settings page reloads automatically once the import completes.
 
 - No build step or bundler is required — all files are plain vanilla JavaScript loaded directly by Chrome.
 - Rule, credential, cooldown, active channel, quiet hours, and user agent data are stored in `chrome.storage.sync`, so they sync across devices signed into the same Chrome profile.
-- The UA override uses a `declarativeNetRequestWithHostAccess` dynamic rule (ID `1`) with `urlFilter: "*"` covering all resource types (main frame, sub-frames, scripts, stylesheets, media, websockets, etc.) for the HTTP header, and a `document_start` content script (`ua-inject.js`) for `navigator.userAgent`. The rule is re-applied on install and browser startup.
+- The UA override uses a `declarativeNetRequestWithHostAccess` dynamic rule (ID `1`) with `urlFilter: "*"` covering all resource types (main frame, sub-frames, scripts, stylesheets, media, websockets, etc.) for the HTTP header. The `navigator.userAgent` JavaScript property is overridden via `chrome.scripting.executeScript` with `world: "MAIN"` and `injectImmediately: true`, fired from the `tabs.onUpdated` listener whenever a tab begins loading. This avoids CSP violations that would result from inline script injection.
 - Auto-refresh state is stored in `chrome.storage.session` (ephemeral, per-session) and auto-refresh alarms are named `refresh-{tabId}`. Both are cleaned up automatically when the tab closes or the browser restarts.
 - The deduplication key is `tabId:ruleId`, stored with a timestamp. A notification is suppressed only while `Date.now() - lastSent < cooldownMs`; once the window passes the notification fires again automatically. The cooldown is shared across channels — switching channel mid-session does not reset it.
 - The content script sets a `setInterval` at the configured cooldown interval so elements that are already present in the DOM (and don't trigger a `MutationObserver` event) are still re-checked and re-notified.

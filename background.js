@@ -191,10 +191,26 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
-// Clear deduplication entries when a tab navigates to a new URL or closes
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (changeInfo.status === "loading") {
-    clearTabDedupeEntries(tabId);
+// Clear deduplication entries and re-inject UA override when a tab navigates
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+  if (changeInfo.status !== "loading") return;
+  clearTabDedupeEntries(tabId);
+
+  const { userAgent = "" } = await chrome.storage.sync.get("userAgent");
+  if (!userAgent) return;
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      world: "MAIN",
+      func: (ua) => {
+        Object.defineProperty(navigator, "userAgent", { get: () => ua, configurable: true });
+      },
+      args: [userAgent],
+      injectImmediately: true,
+    });
+  } catch {
+    // Tab may not be injectable (e.g. chrome:// pages)
   }
 });
 
