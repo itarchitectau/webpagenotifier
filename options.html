@@ -151,7 +151,7 @@
         <button id="exportConfig">Export Configuration</button>
         <button id="exportDaemonConfig" class="secondary">Export for Daemon</button>
       </div>
-      <p class="hint" id="daemonExportHint" style="display:none">Each rule will contain <code>"url": ""</code> — fill in the target URL before running the daemon. Rules sharing the same URL are fetched once per cycle and evaluated together; the shortest <code>checkIntervalSecs</code> among them sets the reload rate.</p>
+      <p class="hint" id="daemonExportHint" style="display:none">Fill in the top-level <code>"url"</code> field before running the daemon. All rules are evaluated against that single page on each cycle.</p>
 
       <div class="card-inner" style="margin-top:12px">
         <h3>Import</h3>

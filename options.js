@@ -259,22 +259,22 @@ async function exportDaemonConfig() {
   const rules = (data.rules ?? []).map(({ id, label, selector, priority, retry, expire, enabled }) => ({
     id,
     label: label || "",
-    url: "https://",
     selector,
-    checkIntervalSecs: 60,
     priority: priority ?? 0,
     ...(priority === 2 && { retry: retry ?? 60, expire: expire ?? 3600 }),
     enabled: enabled !== false,
   }));
 
   const payload = JSON.stringify({
+    url: "https://",
+    checkIntervalSecs: 60,
+    storageStatePath: "",
     notificationChannel: data.notificationChannel || "pushover",
     pushoverUserKey: data.pushoverUserKey || "",
     pushoverAppToken: data.pushoverAppToken || "",
     telegramBotToken: data.telegramBotToken || "",
     telegramChatId: data.telegramChatId || "",
     dedupeIntervalSecs: data.dedupeIntervalSecs ?? 3600,
-    defaultCheckIntervalSecs: 60,
     quietHoursEnabled: data.quietHoursEnabled || false,
     quietHoursStart: data.quietHoursStart || "22:00",
     quietHoursEnd: data.quietHoursEnd || "07:00",
