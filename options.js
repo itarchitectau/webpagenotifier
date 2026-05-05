@@ -259,7 +259,7 @@ async function exportDaemonConfig() {
   const rules = (data.rules ?? []).map(({ id, label, selector, priority, retry, expire, enabled }) => ({
     id,
     label: label || "",
-    url: "",
+    url: "https://",
     selector,
     checkIntervalSecs: 60,
     priority: priority ?? 0,
