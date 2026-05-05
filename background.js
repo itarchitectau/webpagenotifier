@@ -175,6 +175,67 @@ function escHtml(str) {
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+function looksLikeLoginRedirect(expectedUrl, currentUrl) {
+  try {
+    const expected = new URL(expectedUrl);
+    const current = new URL(currentUrl);
+    if (current.origin !== expected.origin) return true;
+    const p = current.pathname.toLowerCase();
+    return ["/login", "/signin", "/sign-in", "/auth", "/sso", "/saml"].some(t => p.includes(t));
+  } catch {
+    return false;
+  }
+}
+
+async function handleSessionExpired(tabId, tab) {
+  const {
+    pushoverUserKey,
+    pushoverAppToken,
+    telegramBotToken,
+    telegramChatId,
+    notificationChannel = "pushover",
+    sentNotifications = {},
+    dedupeIntervalSecs = DEFAULT_DEDUPE_INTERVAL_SECS,
+  } = await chrome.storage.sync.get([
+    "pushoverUserKey", "pushoverAppToken",
+    "telegramBotToken", "telegramChatId",
+    "notificationChannel", "sentNotifications", "dedupeIntervalSecs",
+  ]);
+
+  const dedupeKey = `${tabId}:session-expired`;
+  const lastSent = sentNotifications[dedupeKey];
+  if (lastSent && Date.now() - lastSent < dedupeIntervalSecs * 1000) return;
+
+  const title = "Session expired";
+  const lines = [
+    `Tab: ${tab.title || tab.url}`,
+    `Redirected to: ${tab.url}`,
+    "Your session has expired — re-open the tab to log in again.",
+  ];
+
+  let succeeded = false;
+  if (notificationChannel === "pushover") {
+    if (!pushoverUserKey || !pushoverAppToken) {
+      console.warn("[Notifier] Pushover credentials not configured.");
+      return;
+    }
+    // Priority 1 (High) bypasses Pushover quiet hours — session expiry needs prompt attention
+    succeeded = await sendPushover({ token: pushoverAppToken, user: pushoverUserKey, title, lines, url: tab.url, priority: 1 });
+  } else if (notificationChannel === "telegram") {
+    if (!telegramBotToken || !telegramChatId) {
+      console.warn("[Notifier] Telegram credentials not configured.");
+      return;
+    }
+    succeeded = await sendTelegram({ botToken: telegramBotToken, chatId: telegramChatId, title, lines, url: tab.url });
+  }
+
+  if (succeeded) {
+    sentNotifications[dedupeKey] = Date.now();
+    await chrome.storage.sync.set({ sentNotifications });
+    console.log("[Notifier] Session expiry notification sent for tab:", tabId);
+  }
+}
+
 // Auto-refresh: reload tab on alarm
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (!alarm.name.startsWith("refresh-")) return;
@@ -191,26 +252,36 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
-// Clear deduplication entries and re-inject UA override when a tab navigates
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
-  if (changeInfo.status !== "loading") return;
-  clearTabDedupeEntries(tabId);
+// Clear deduplication entries and re-inject UA override when a tab navigates;
+// check for session expiry once the page has fully loaded.
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status === "loading") {
+    clearTabDedupeEntries(tabId);
 
-  const { userAgent = "" } = await chrome.storage.sync.get("userAgent");
-  if (!userAgent) return;
+    const { userAgent = "" } = await chrome.storage.sync.get("userAgent");
+    if (userAgent) {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId, allFrames: true },
+          world: "MAIN",
+          func: (ua) => {
+            Object.defineProperty(navigator, "userAgent", { get: () => ua, configurable: true });
+          },
+          args: [userAgent],
+          injectImmediately: true,
+        });
+      } catch {
+        // Tab may not be injectable (e.g. chrome:// pages)
+      }
+    }
+  }
 
-  try {
-    await chrome.scripting.executeScript({
-      target: { tabId, allFrames: true },
-      world: "MAIN",
-      func: (ua) => {
-        Object.defineProperty(navigator, "userAgent", { get: () => ua, configurable: true });
-      },
-      args: [userAgent],
-      injectImmediately: true,
-    });
-  } catch {
-    // Tab may not be injectable (e.g. chrome:// pages)
+  if (changeInfo.status === "complete" && tab.url) {
+    const { tabRefresh = {} } = await chrome.storage.session.get("tabRefresh");
+    const refreshState = tabRefresh[tabId];
+    if (refreshState?.url && looksLikeLoginRedirect(refreshState.url, tab.url)) {
+      await handleSessionExpired(tabId, tab);
+    }
   }
 });
 

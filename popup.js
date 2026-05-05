@@ -99,8 +99,9 @@ async function enableRefresh() {
   const intervalSecs = Math.max(30, parseInt(document.getElementById("refreshInterval").value, 10) || 60);
   document.getElementById("refreshInterval").value = intervalSecs;
 
+  const tab = await chrome.tabs.get(currentTabId);
   const { tabRefresh = {} } = await chrome.storage.session.get("tabRefresh");
-  tabRefresh[currentTabId] = { intervalSecs };
+  tabRefresh[currentTabId] = { intervalSecs, url: tab.url };
   await chrome.storage.session.set({ tabRefresh });
 
   await chrome.alarms.clear(`refresh-${currentTabId}`);
