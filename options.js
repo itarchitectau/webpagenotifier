@@ -254,6 +254,44 @@ async function saveUserAgent() {
   showStatus("uaStatus", userAgent ? "User agent saved." : "User agent reset to default.", "ok");
 }
 
+async function exportDaemonConfig() {
+  const data = await chrome.storage.sync.get(CONFIG_KEYS);
+  const rules = (data.rules ?? []).map(({ id, label, selector, priority, retry, expire, enabled }) => ({
+    id,
+    label: label || "",
+    url: "",
+    selector,
+    checkIntervalSecs: 60,
+    priority: priority ?? 0,
+    ...(priority === 2 && { retry: retry ?? 60, expire: expire ?? 3600 }),
+    enabled: enabled !== false,
+  }));
+
+  const payload = JSON.stringify({
+    notificationChannel: data.notificationChannel || "pushover",
+    pushoverUserKey: data.pushoverUserKey || "",
+    pushoverAppToken: data.pushoverAppToken || "",
+    telegramBotToken: data.telegramBotToken || "",
+    telegramChatId: data.telegramChatId || "",
+    dedupeIntervalSecs: data.dedupeIntervalSecs ?? 3600,
+    defaultCheckIntervalSecs: 60,
+    quietHoursEnabled: data.quietHoursEnabled || false,
+    quietHoursStart: data.quietHoursStart || "22:00",
+    quietHoursEnd: data.quietHoursEnd || "07:00",
+    userAgent: data.userAgent || "",
+    rules,
+  }, null, 2);
+
+  const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "page-notifier-daemon-config.json";
+  a.click();
+  URL.revokeObjectURL(url);
+  $("daemonExportHint").style.display = "";
+  showStatus("exportImportStatus", "Daemon configuration exported.", "ok");
+}
+
 async function exportConfig() {
   const data = await chrome.storage.sync.get(CONFIG_KEYS);
   const payload = JSON.stringify({ version: 1, exported: new Date().toISOString(), config: data }, null, 2);
@@ -304,6 +342,7 @@ async function importConfig() {
   setTimeout(load, 1000);
 }
 
+$("exportDaemonConfig").addEventListener("click", exportDaemonConfig);
 $("saveUserAgent").addEventListener("click", saveUserAgent);
 $("uaPreset").addEventListener("change", updateUaCustomField);
 $("exportConfig").addEventListener("click", exportConfig);
